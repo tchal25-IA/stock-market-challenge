@@ -1,17 +1,25 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+/** Niveau minimum pour le bot Hold Champion. */
+export const HOLD_BOT_UNLOCK_LEVEL = 11;
+
 @Injectable()
 export class TradingService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async buy(userId: string, symbol: string, amountEur: number) {
+  async buy(
+    userId: string,
+    symbol: string,
+    amountEur: number,
+    opts: { source?: string; skipLevelCheck?: boolean } = {},
+  ) {
     if (amountEur <= 0) throw new BadRequestException('Montant invalide');
     const asset = await this.prisma.asset.findUnique({ where: { symbol: symbol.toUpperCase() } });
     if (!asset) throw new NotFoundException('Titre introuvable');
 
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    if (asset.unlockLevel > user.level) {
+    if (!opts.skipLevelCheck && asset.unlockLevel > user.level) {
       throw new BadRequestException(`Titre verrouillé — niveau ${asset.unlockLevel} requis`);
     }
     if (user.cash < amountEur) throw new BadRequestException('Cash insuffisant');
@@ -47,6 +55,7 @@ export class TradingService {
           quantity,
           price: asset.currentPrice,
           total,
+          source: opts.source ?? 'manual',
         },
       });
     });
@@ -54,7 +63,7 @@ export class TradingService {
     return { ok: true, side: 'buy', symbol: asset.symbol, quantity, price: asset.currentPrice, total };
   }
 
-  async sell(userId: string, symbol: string, quantity: number) {
+  async sell(userId: string, symbol: string, quantity: number, opts: { source?: string } = {}) {
     if (quantity <= 0) throw new BadRequestException('Quantité invalide');
     const asset = await this.prisma.asset.findUnique({ where: { symbol: symbol.toUpperCase() } });
     if (!asset) throw new NotFoundException('Titre introuvable');
@@ -89,6 +98,7 @@ export class TradingService {
           quantity,
           price: asset.currentPrice,
           total,
+          source: opts.source ?? 'manual',
         },
       });
     });

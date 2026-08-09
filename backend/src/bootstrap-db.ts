@@ -2,10 +2,19 @@ import { copyFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
 /**
- * Sur Vercel : copie d'une DB pré-seedée vers /tmp (écriture possible).
- * En local : DATABASE_URL=file:./dev.db
+ * Résolution DB:
+ * - DATABASE_URL postgres/neon/supabase → utilisé tel quel (prod durable)
+ * - Vercel sans Postgres → copie seed.db SQLite vers /tmp
+ * - Local sans URL → sqlite file:./dev.db
  */
 export async function ensureDatabase() {
+  const url = process.env.DATABASE_URL ?? '';
+  const isPostgres = /^postgres(ql)?:\/\//i.test(url);
+
+  if (isPostgres) {
+    return;
+  }
+
   if (process.env.VERCEL) {
     const target = '/tmp/smc.db';
     process.env.DATABASE_URL = `file:${target}`;

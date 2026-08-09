@@ -23,7 +23,7 @@ async function request<T>(
       if (Array.isArray(parsed.message)) message = parsed.message.join(', ');
       else if (parsed.message) message = parsed.message;
     } catch {
-      /* raw text */
+      /* raw */
     }
     const err = new Error(message) as Error & { status?: number };
     err.status = res.status;
@@ -35,6 +35,7 @@ async function request<T>(
 export type AuthUser = {
   id: string;
   username: string;
+  email?: string | null;
   level: number;
   cash: number;
   tutorialDone: boolean;
@@ -43,11 +44,15 @@ export type AuthUser = {
 
 export type AuthResponse = { accessToken: string; user: AuthUser };
 
+export type AssetKind = 'stock' | 'bond' | 'commodity';
+
 export type MarketAsset = {
   id: string;
   symbol: string;
   name: string;
   sector: string;
+  kind: AssetKind;
+  kindLabel: string;
   price: number;
   unlockLevel: number;
   blurb?: string;
@@ -60,6 +65,8 @@ export type LockedAsset = {
   symbol: string;
   name: string;
   sector: string;
+  kind: string;
+  kindLabel: string;
   unlockLevel: number;
 };
 
@@ -85,12 +92,20 @@ export type Portfolio = {
   maxLevel: number;
   progressPct: number;
   tutorialDone: boolean;
-  nextUnlocks: Array<{ symbol: string; name: string; unlockLevel: number }>;
+  nextUnlocks: Array<{ symbol: string; name: string; kind?: string; unlockLevel: number }>;
   unlockedCount: number;
+  botUnlockLevel: number;
+  educationTip: string;
+  allocation: { stock: number; bond: number; commodity: number };
+  isGuest: boolean;
+  username: string;
+  email?: string | null;
   positions: Array<{
     symbol: string;
     name: string;
     sector?: string;
+    kind?: AssetKind;
+    kindLabel?: string;
     quantity: number;
     avgCost?: number;
     price: number;
@@ -106,18 +121,47 @@ export type TradeRow = {
   quantity: number;
   price: number;
   total: number;
+  source?: string;
   createdAt: string;
-  asset: { symbol: string; name: string };
+  asset: { symbol: string; name: string; kind?: string };
+};
+
+export type BotInfo = {
+  id: string;
+  kind: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  allocationPct: number;
 };
 
 export const api = {
   guest: () => request<AuthResponse>('/auth/guest', { method: 'POST' }),
+  register: (email: string, username: string, password: string) =>
+    request<AuthResponse>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, username, password }),
+    }),
+  login: (login: string, password: string) =>
+    request<AuthResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ login, password }),
+    }),
+  claim: (token: string, email: string, username: string, password: string) =>
+    request<AuthResponse>('/auth/claim', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ email, username, password }),
+    }),
+  me: (token: string) => request<AuthUser>('/auth/me', { token }),
   market: (token: string) => request<MarketResponse>('/market', { token }),
   asset: (token: string, symbol: string) =>
     request<{
       symbol: string;
       name: string;
       sector: string;
+      kind: AssetKind;
+      kindLabel: string;
       price: number;
       blurb?: string;
       changePct: number;
@@ -127,6 +171,14 @@ export const api = {
     }>(`/market/assets/${symbol}`, { token }),
   portfolio: (token: string) => request<Portfolio>('/portfolio', { token }),
   history: (token: string) => request<TradeRow[]>('/portfolio/history', { token }),
+  bots: (token: string) =>
+    request<{ unlockLevel: number; unlocked: boolean; bots: BotInfo[] }>('/bots', { token }),
+  configureBot: (token: string, kind: string, enabled: boolean, allocationPct: number) =>
+    request('/bots/configure', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ kind, enabled, allocationPct }),
+    }),
   buy: (token: string, symbol: string, amountEur: number) =>
     request('/trading/buy', {
       method: 'POST',
@@ -143,8 +195,11 @@ export const api = {
   tutorialDone: (token: string) =>
     request('/portfolio/tutorial-done', { method: 'POST', token }),
   levelUp: (token: string) =>
-    request<{ ok: boolean; level?: number; reason?: string; unlocked?: Array<{ symbol: string; name: string }> }>(
-      '/portfolio/level-up',
-      { method: 'POST', token },
-    ),
+    request<{
+      ok: boolean;
+      level?: number;
+      reason?: string;
+      unlocked?: Array<{ symbol: string; name: string; kind?: string }>;
+      educationTip?: string | null;
+    }>('/portfolio/level-up', { method: 'POST', token }),
 };

@@ -9,6 +9,7 @@ type SeedAsset = {
   symbol: string;
   name: string;
   sector: string;
+  kind: string;
   price0: number;
   mu: number;
   sigma: number;
@@ -22,13 +23,13 @@ function loadMarket(): { assets: SeedAsset[]; series: Record<string, number[]> |
     path.resolve(__dirname, 'seed-market.json'),
     path.resolve(__dirname, '../../simulation/out/market.json'),
   ];
+  const bySymbol = new Map(ASSET_CATALOG.map((a) => [a.symbol, a]));
   for (const file of candidates) {
     if (!fs.existsSync(file)) continue;
     const raw = JSON.parse(fs.readFileSync(file, 'utf-8')) as {
-      assets: Array<SeedAsset & { unlock_level?: number }>;
+      assets: Array<SeedAsset & { unlock_level?: number; kind?: string }>;
       series: Record<string, number[]>;
     };
-    const bySymbol = new Map(ASSET_CATALOG.map((a) => [a.symbol, a]));
     return {
       assets: raw.assets.map((a) => {
         const cat = bySymbol.get(a.symbol);
@@ -36,6 +37,7 @@ function loadMarket(): { assets: SeedAsset[]; series: Record<string, number[]> |
           symbol: a.symbol,
           name: a.name,
           sector: a.sector,
+          kind: a.kind ?? cat?.kind ?? 'stock',
           price0: a.price0,
           mu: a.mu,
           sigma: a.sigma,
@@ -52,6 +54,7 @@ function loadMarket(): { assets: SeedAsset[]; series: Record<string, number[]> |
       symbol: a.symbol,
       name: a.name,
       sector: a.sector,
+      kind: a.kind,
       price0: a.price0,
       mu: a.mu,
       sigma: a.sigma,
@@ -68,6 +71,7 @@ async function main() {
 
   await prisma.trade.deleteMany();
   await prisma.holding.deleteMany();
+  await prisma.bot.deleteMany();
   await prisma.priceTick.deleteMany();
   await prisma.asset.deleteMany();
   await prisma.marketState.deleteMany();
@@ -78,6 +82,7 @@ async function main() {
         symbol: a.symbol,
         name: a.name,
         sector: a.sector,
+        kind: a.kind,
         price0: a.price0,
         mu: a.mu,
         sigma: a.sigma,
@@ -104,15 +109,21 @@ async function main() {
     });
   }
 
-  // Ajoute les titres du catalogue absents du JSON de simu
   for (const cat of ASSET_CATALOG) {
     const exists = await prisma.asset.findUnique({ where: { symbol: cat.symbol } });
-    if (exists) continue;
+    if (exists) {
+      await prisma.asset.update({
+        where: { id: exists.id },
+        data: { kind: cat.kind, unlockLevel: cat.unlockLevel, name: cat.name, sector: cat.sector },
+      });
+      continue;
+    }
     const created = await prisma.asset.create({
       data: {
         symbol: cat.symbol,
         name: cat.name,
         sector: cat.sector,
+        kind: cat.kind,
         price0: cat.price0,
         mu: cat.mu,
         sigma: cat.sigma,

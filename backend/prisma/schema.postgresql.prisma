@@ -2,8 +2,10 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Copie Postgres — activer via: npm run db:use-postgres
+// Puis DATABASE_URL=postgresql://... npx prisma db push && npm run prisma:seed
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -32,7 +34,6 @@ model Asset {
   symbol String @unique
   name   String
   sector String
-  /// stock | bond | commodity
   kind   String @default("stock")
 
   price0 Float
@@ -95,7 +96,6 @@ model Trade {
   quantity  Float
   price     Float
   total     Float
-  /// manual | bot:hold
   source    String   @default("manual")
   createdAt DateTime @default(now())
 
@@ -103,15 +103,14 @@ model Trade {
 }
 
 model Bot {
-  id           String  @id @default(cuid())
-  userId       String
-  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  /// hold
-  kind         String  @default("hold")
-  enabled      Boolean @default(false)
-  allocationPct Float  @default(20)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind          String   @default("hold")
+  enabled       Boolean  @default(false)
+  allocationPct Float    @default(20)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@unique([userId, kind])
 }

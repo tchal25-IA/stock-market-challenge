@@ -1,6 +1,6 @@
 # Stock Market Challenge
 
-Jeu de bourse fictive — Phase 1 (niveaux 1–10, 15 titres, unlock progressif).
+Jeu de bourse fictive — Phase 1.1 (niveaux 1–20, actions / obligations / matières, bot Hold).
 
 ## Déploiement
 
@@ -10,7 +10,7 @@ Jeu de bourse fictive — Phase 1 (niveaux 1–10, 15 titres, unlock progressif)
 | API (NestJS) | **Vercel** | https://stock-market-challenge-api.vercel.app/api |
 | Code | **GitHub** | https://github.com/tchal25-IA/stock-market-challenge |
 
-> SQLite sur Vercel = demo / vertical slice. Pour une prod durable : PostgreSQL (Supabase/Neon).
+> SQLite sur Vercel = demo / vertical slice. **Prod durable :** PostgreSQL (`npm run db:use-postgres` + `DATABASE_URL` Supabase/Neon/Docker).
 
 ## Structure
 

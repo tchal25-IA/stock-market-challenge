@@ -1,8 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { GbmEngine } from './gbm.engine';
-import { ASSET_CATALOG, blurbFor } from './assets.catalog';
+import { ASSET_CATALOG, blurbFor, kindFor, KIND_LABEL } from './assets.catalog';
+import { BotsService } from '../bots/bots.service';
 
 @Injectable()
 export class MarketService implements OnModuleInit {
@@ -12,6 +13,7 @@ export class MarketService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gbm: GbmEngine,
+    @Inject(forwardRef(() => BotsService)) private readonly bots: BotsService,
   ) {}
 
   async onModuleInit() {
@@ -26,7 +28,6 @@ export class MarketService implements OnModuleInit {
     }
   }
 
-  /** Upsert des titres manquants (déploiements serverless / DB /tmp). */
   private async ensureCatalogAssets() {
     for (const a of ASSET_CATALOG) {
       const existing = await this.prisma.asset.findUnique({ where: { symbol: a.symbol } });
@@ -36,6 +37,7 @@ export class MarketService implements OnModuleInit {
           data: {
             name: a.name,
             sector: a.sector,
+            kind: a.kind,
             unlockLevel: a.unlockLevel,
             mu: a.mu,
             sigma: a.sigma,
@@ -50,6 +52,7 @@ export class MarketService implements OnModuleInit {
           symbol: a.symbol,
           name: a.name,
           sector: a.sector,
+          kind: a.kind,
           price0: a.price0,
           mu: a.mu,
           sigma: a.sigma,
@@ -68,7 +71,6 @@ export class MarketService implements OnModuleInit {
 
   @Interval(Number(process.env.TICK_INTERVAL_MS ?? 45000))
   async scheduledTick() {
-    // Pas de cron long-running fiable sur Vercel serverless
     if (process.env.VERCEL) return;
     try {
       await this.advanceTick();
@@ -77,7 +79,6 @@ export class MarketService implements OnModuleInit {
     }
   }
 
-  /** Avance le marché si l’intervalle est écoulé (essentiel sur Vercel). */
   async maybeAdvance() {
     const interval = Number(process.env.TICK_INTERVAL_MS ?? 45000);
     const state = await this.prisma.marketState.findUnique({ where: { id: 1 } });
@@ -102,6 +103,8 @@ export class MarketService implements OnModuleInit {
         symbol: a.symbol,
         name: a.name,
         sector: a.sector,
+        kind: a.kind,
+        kindLabel: KIND_LABEL[kindFor(a.symbol)],
         unlockLevel: a.unlockLevel,
       }));
 
@@ -116,11 +119,14 @@ export class MarketService implements OnModuleInit {
         const prev = recent[1]?.price ?? newest;
         const dayRef = recent[Math.min(23, recent.length - 1)]?.price ?? newest;
         const spark = [...recent].reverse().map((t) => t.price);
+        const kind = (a.kind as 'stock' | 'bond' | 'commodity') || kindFor(a.symbol);
         return {
           id: a.id,
           symbol: a.symbol,
           name: a.name,
           sector: a.sector,
+          kind,
+          kindLabel: KIND_LABEL[kind],
           price: a.currentPrice,
           unlockLevel: a.unlockLevel,
           blurb: blurbFor(a.symbol),
@@ -153,11 +159,14 @@ export class MarketService implements OnModuleInit {
     const first = history[0]?.price ?? asset.currentPrice;
     const last = history[history.length - 1]?.price ?? asset.currentPrice;
     const prev = history.length > 1 ? history[history.length - 2].price : last;
+    const kind = (asset.kind as 'stock' | 'bond' | 'commodity') || kindFor(asset.symbol);
     return {
       id: asset.id,
       symbol: asset.symbol,
       name: asset.name,
       sector: asset.sector,
+      kind,
+      kindLabel: KIND_LABEL[kind],
       price: asset.currentPrice,
       unlockLevel: asset.unlockLevel,
       blurb: blurbFor(asset.symbol),
@@ -166,9 +175,11 @@ export class MarketService implements OnModuleInit {
       history,
       glossary: {
         action: 'Une action = une part de propriété d’une entreprise fictive.',
+        obligation: 'Une obligation = un prêt à un émetteur ; plus stable, moins de rendement.',
+        matiere: 'Une matière première = or, pétrole, blé… sensible aux chocs macro.',
         pnl: 'P&L = gains ou pertes latents / réalisés sur ton portefeuille.',
         gbm: 'Les prix évoluent via une simulation réaliste (mouvement brownien géométrique).',
-        secteur: `Secteur ${asset.sector} — les titres d’un même secteur bougent souvent ensemble.`,
+        secteur: `Secteur ${asset.sector} — les titres proches bougent souvent ensemble.`,
       },
     };
   }
@@ -217,6 +228,12 @@ export class MarketService implements OnModuleInit {
       const cutoff = nextTick - 200;
       if (cutoff > 0) {
         await this.prisma.priceTick.deleteMany({ where: { tick: { lt: cutoff } } });
+      }
+
+      try {
+        await this.bots.runAllEnabled();
+      } catch (e) {
+        this.logger.warn(`Bots tick failed: ${(e as Error).message}`);
       }
 
       this.logger.debug(`Market tick ${nextTick}${step.event ? ` [${step.event.kind}]` : ''}`);

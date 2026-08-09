@@ -8,6 +8,8 @@
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
     "bake:db": "node scripts/bake-db.js",
+    "db:use-postgres": "node scripts/use-postgres.js",
+    "db:use-sqlite": "node scripts/use-sqlite.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma db push",
     "prisma:migrate:dev": "prisma db push",

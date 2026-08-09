@@ -34,4 +34,14 @@ export const sectorLabel: Record<string, string> = {
   industrial: 'Industrie',
   materials: 'Matériaux',
   utilities: 'Utilities',
+  fixed_income: 'Taux',
+  commodities: 'Matières',
+  index: 'Indice',
+  real_estate: 'Immo',
+};
+
+export const kindColor: Record<string, string> = {
+  stock: '#0B6E4F',
+  bond: '#1F5C99',
+  commodity: '#B86A00',
 };

@@ -1,9 +1,15 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ClaimDto } from './dto/claim.dto';
 
 @Injectable()
 export class AuthService {
@@ -22,13 +28,13 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     const existing = await this.prisma.user.findFirst({
-      where: { OR: [{ email: dto.email }, { username: dto.username }] },
+      where: { OR: [{ email: dto.email.toLowerCase() }, { username: dto.username }] },
     });
     if (existing) throw new ConflictException('Email ou username déjà pris');
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const passwordHash = await bcrypt.hash(dto.password, 12);
     const user = await this.prisma.user.create({
       data: {
-        email: dto.email,
+        email: dto.email.toLowerCase(),
         username: dto.username,
         passwordHash,
         isGuest: false,
@@ -40,9 +46,10 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+    const login = dto.login.trim();
     const user = await this.prisma.user.findFirst({
       where: {
-        OR: [{ email: dto.login }, { username: dto.login }],
+        OR: [{ email: login.toLowerCase() }, { username: login }],
       },
     });
     if (!user?.passwordHash) throw new UnauthorizedException('Identifiants invalides');
@@ -51,9 +58,49 @@ export class AuthService {
     return this.tokenResponse(user.id);
   }
 
+  /** Convertit un compte invité en compte permanent (conserve portfolio). */
+  async claim(userId: string, dto: ClaimDto) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (!user.isGuest) throw new BadRequestException('Compte déjà enregistré');
+    const clash = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ email: dto.email.toLowerCase() }, { username: dto.username }],
+        NOT: { id: userId },
+      },
+    });
+    if (clash) throw new ConflictException('Email ou username déjà pris');
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        email: dto.email.toLowerCase(),
+        username: dto.username,
+        passwordHash,
+        isGuest: false,
+      },
+    });
+    return this.tokenResponse(userId);
+  }
+
+  async me(userId: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      isGuest: user.isGuest,
+      level: user.level,
+      cash: user.cash,
+      tutorialDone: user.tutorialDone,
+    };
+  }
+
   private async tokenResponse(userId: string) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    const accessToken = await this.jwt.signAsync({ sub: userId });
+    const accessToken = await this.jwt.signAsync(
+      { sub: userId, guest: user.isGuest },
+      { expiresIn: user.isGuest ? '14d' : '7d' },
+    );
     return {
       accessToken,
       user: {
