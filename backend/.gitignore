@@ -1,0 +1,8 @@
+node_modules/
+.env
+.vercel
+dist/
+prisma/dev.db
+prisma/dev.db-journal
+prisma/seed.db
+prisma/seed.db-journal

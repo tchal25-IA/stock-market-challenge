@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Stock Market Challenge",
+    "slug": "stock-market-challenge",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.smc.app"
+    },
+    "android": {
+      "package": "com.smc.app"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

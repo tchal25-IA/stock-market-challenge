@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String  @id @default(cuid())
+  email        String? @unique
+  username     String  @unique
+  passwordHash String?
+  isGuest      Boolean @default(true)
+
+  level Int   @default(1)
+  cash  Float @default(10000)
+
+  tutorialDone Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  holdings Holding[]
+  trades   Trade[]
+}
+
+model Asset {
+  id     String @id @default(cuid())
+  symbol String @unique
+  name   String
+  sector String
+
+  price0 Float
+  mu     Float
+  sigma  Float
+  anchor Float
+  kappa  Float @default(0.08)
+
+  currentPrice Float
+  unlockLevel  Int   @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ticks    PriceTick[]
+  holdings Holding[]
+  trades   Trade[]
+}
+
+model PriceTick {
+  id      String   @id @default(cuid())
+  assetId String
+  asset   Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  price   Float
+  tick    Int
+  at      DateTime @default(now())
+}
+
+model MarketState {
+  id          Int       @id @default(1)
+  currentTick Int       @default(0)
+  lastEvent   String?
+  lastEventAt DateTime?
+  updatedAt   DateTime  @updatedAt
+}
+
+model Holding {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assetId  String
+  asset    Asset  @relation(fields: [assetId], references: [id])
+  quantity Float
+  avgCost  Float
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, assetId])
+}
+
+model Trade {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assetId   String
+  asset     Asset    @relation(fields: [assetId], references: [id])
+  side      String
+  quantity  Float
+  price     Float
+  total     Float
+  createdAt DateTime @default(now())
+}

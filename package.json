@@ -1,0 +1,25 @@
+{
+  "name": "stock-market-challenge",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "backend",
+    "mobile"
+  ],
+  "scripts": {
+    "sim:test": "cd simulation && python3 -m unittest test_gbm.py -v",
+    "sim:run": "cd simulation && python3 gbm.py --ticks 500 --seed 42 --out out",
+    "dev:api": "npm run start:dev -w @smc/api",
+    "dev:mobile": "npm run start -w @smc/mobile",
+    "db:generate": "npm run prisma:generate -w @smc/api",
+    "db:migrate": "npm run prisma:migrate:dev -w @smc/api",
+    "db:seed": "npm run prisma:seed -w @smc/api",
+    "db:setup": "npm run db:generate && npm run db:migrate && npm run db:seed",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "setup": "npm install && npm run sim:run && npm run db:setup"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
