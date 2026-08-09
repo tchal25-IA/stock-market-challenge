@@ -1,6 +1,6 @@
 # Stock Market Challenge
 
-Jeu de bourse fictive — Phase 1 (niveaux 1–10).
+Jeu de bourse fictive — Phase 1 (niveaux 1–10, 15 titres, unlock progressif).
 
 ## Déploiement
 

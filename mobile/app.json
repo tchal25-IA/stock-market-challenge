@@ -5,6 +5,10 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#E4F0EB"
+    },
+    "backgroundColor": "#E4F0EB",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.smc.app"

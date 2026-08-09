@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ASSET_CATALOG } from '../market/assets.catalog';
 
-/** Levels 1–10: same 5 stocks; target portfolio value 15k€ to clear. */
-export const LEVEL_TARGET = 15000;
 export const MAX_LEVEL_PHASE1 = 10;
+
+/** Objectif de valeur portefeuille pour passer le niveau courant. */
+export function targetForLevel(level: number): number {
+  return 10000 + level * 5000;
+}
 
 @Injectable()
 export class PortfolioService {
@@ -25,6 +29,7 @@ export class PortfolioService {
         assetId: h.assetId,
         symbol: h.asset.symbol,
         name: h.asset.name,
+        sector: h.asset.sector,
         quantity: h.quantity,
         avgCost: h.avgCost,
         price: h.asset.currentPrice,
@@ -38,8 +43,15 @@ export class PortfolioService {
     const totalValue = user.cash + holdingsValue;
     const totalPnl = totalValue - 10000;
     const totalPnlPct = (totalPnl / 10000) * 100;
-    const targetReached = totalValue >= LEVEL_TARGET;
+    const target = targetForLevel(user.level);
+    const targetReached = totalValue >= target;
     const canLevelUp = targetReached && user.level < MAX_LEVEL_PHASE1;
+    const nextUnlocks = ASSET_CATALOG.filter((a) => a.unlockLevel === user.level + 1).map((a) => ({
+      symbol: a.symbol,
+      name: a.name,
+      unlockLevel: a.unlockLevel,
+    }));
+    const unlockedSymbols = ASSET_CATALOG.filter((a) => a.unlockLevel <= user.level).map((a) => a.symbol);
 
     return {
       cash: user.cash,
@@ -48,11 +60,14 @@ export class PortfolioService {
       totalPnl,
       totalPnlPct,
       level: user.level,
-      target: LEVEL_TARGET,
+      target,
       targetReached,
       canLevelUp,
       maxLevel: MAX_LEVEL_PHASE1,
+      progressPct: Math.min(100, (totalValue / target) * 100),
       tutorialDone: user.tutorialDone,
+      nextUnlocks,
+      unlockedCount: unlockedSymbols.length,
       positions,
     };
   }
@@ -74,7 +89,16 @@ export class PortfolioService {
       where: { id: userId },
       data: { level: { increment: 1 } },
     });
-    return { ok: true, level: user.level, portfolio: await this.getPortfolio(userId) };
+    const unlocked = ASSET_CATALOG.filter((a) => a.unlockLevel === user.level).map((a) => ({
+      symbol: a.symbol,
+      name: a.name,
+    }));
+    return {
+      ok: true,
+      level: user.level,
+      unlocked,
+      portfolio: await this.getPortfolio(userId),
+    };
   }
 
   async history(userId: string) {

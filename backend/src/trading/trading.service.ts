@@ -11,6 +11,9 @@ export class TradingService {
     if (!asset) throw new NotFoundException('Titre introuvable');
 
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (asset.unlockLevel > user.level) {
+      throw new BadRequestException(`Titre verrouillé — niveau ${asset.unlockLevel} requis`);
+    }
     if (user.cash < amountEur) throw new BadRequestException('Cash insuffisant');
 
     const quantity = amountEur / asset.currentPrice;

@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { GbmEngine } from './gbm.engine';
+import { ASSET_CATALOG, blurbFor } from './assets.catalog';
 
 @Injectable()
 export class MarketService implements OnModuleInit {
@@ -14,15 +15,60 @@ export class MarketService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    await this.ensureMarketState();
+    await this.ensureCatalogAssets();
+  }
+
+  private async ensureMarketState() {
     const state = await this.prisma.marketState.findUnique({ where: { id: 1 } });
     if (!state) {
       await this.prisma.marketState.create({ data: { id: 1, currentTick: 0 } });
     }
   }
 
+  /** Upsert des titres manquants (déploiements serverless / DB /tmp). */
+  private async ensureCatalogAssets() {
+    for (const a of ASSET_CATALOG) {
+      const existing = await this.prisma.asset.findUnique({ where: { symbol: a.symbol } });
+      if (existing) {
+        await this.prisma.asset.update({
+          where: { id: existing.id },
+          data: {
+            name: a.name,
+            sector: a.sector,
+            unlockLevel: a.unlockLevel,
+            mu: a.mu,
+            sigma: a.sigma,
+            anchor: a.anchor,
+            kappa: a.kappa,
+          },
+        });
+        continue;
+      }
+      const created = await this.prisma.asset.create({
+        data: {
+          symbol: a.symbol,
+          name: a.name,
+          sector: a.sector,
+          price0: a.price0,
+          mu: a.mu,
+          sigma: a.sigma,
+          anchor: a.anchor,
+          kappa: a.kappa,
+          currentPrice: a.price0,
+          unlockLevel: a.unlockLevel,
+        },
+      });
+      await this.prisma.priceTick.create({
+        data: { assetId: created.id, price: a.price0, tick: 0 },
+      });
+      this.logger.log(`Asset ajouté: ${a.symbol}`);
+    }
+  }
+
   @Interval(Number(process.env.TICK_INTERVAL_MS ?? 45000))
   async scheduledTick() {
-    // Pas de cron long-running sur Vercel serverless
+    // Pas de cron long-running fiable sur Vercel serverless
     if (process.env.VERCEL) return;
     try {
       await this.advanceTick();
@@ -31,23 +77,67 @@ export class MarketService implements OnModuleInit {
     }
   }
 
+  /** Avance le marché si l’intervalle est écoulé (essentiel sur Vercel). */
+  async maybeAdvance() {
+    const interval = Number(process.env.TICK_INTERVAL_MS ?? 45000);
+    const state = await this.prisma.marketState.findUnique({ where: { id: 1 } });
+    if (!state) return null;
+    const elapsed = Date.now() - new Date(state.updatedAt).getTime();
+    if (elapsed >= interval) {
+      return this.advanceTick();
+    }
+    return null;
+  }
+
   async listAssets(userLevel = 1) {
+    await this.maybeAdvance();
     const assets = await this.prisma.asset.findMany({
-      where: { unlockLevel: { lte: userLevel } },
-      orderBy: { symbol: 'asc' },
+      orderBy: [{ unlockLevel: 'asc' }, { symbol: 'asc' }],
     });
     const state = await this.prisma.marketState.findUnique({ where: { id: 1 } });
-    return {
-      tick: state?.currentTick ?? 0,
-      lastEvent: state?.lastEvent ?? null,
-      assets: assets.map((a) => ({
-        id: a.id,
+    const unlocked = assets.filter((a) => a.unlockLevel <= userLevel);
+    const locked = assets
+      .filter((a) => a.unlockLevel > userLevel)
+      .map((a) => ({
         symbol: a.symbol,
         name: a.name,
         sector: a.sector,
-        price: a.currentPrice,
         unlockLevel: a.unlockLevel,
-      })),
+      }));
+
+    const withChange = await Promise.all(
+      unlocked.map(async (a) => {
+        const recent = await this.prisma.priceTick.findMany({
+          where: { assetId: a.id },
+          orderBy: { tick: 'desc' },
+          take: 25,
+        });
+        const newest = recent[0]?.price ?? a.currentPrice;
+        const prev = recent[1]?.price ?? newest;
+        const dayRef = recent[Math.min(23, recent.length - 1)]?.price ?? newest;
+        const spark = [...recent].reverse().map((t) => t.price);
+        return {
+          id: a.id,
+          symbol: a.symbol,
+          name: a.name,
+          sector: a.sector,
+          price: a.currentPrice,
+          unlockLevel: a.unlockLevel,
+          blurb: blurbFor(a.symbol),
+          changePct: prev > 0 ? ((newest - prev) / prev) * 100 : 0,
+          changePctDay: dayRef > 0 ? ((newest - dayRef) / dayRef) * 100 : 0,
+          sparkline: spark.slice(-16),
+        };
+      }),
+    );
+
+    return {
+      tick: state?.currentTick ?? 0,
+      lastEvent: state?.lastEvent ?? null,
+      assets: withChange,
+      locked,
+      unlockedCount: unlocked.length,
+      totalCount: assets.length,
     };
   }
 
@@ -59,17 +149,26 @@ export class MarketService implements OnModuleInit {
       orderBy: { tick: 'asc' },
       take: 96,
     });
+    const history = ticks.map((t) => ({ tick: t.tick, price: t.price, at: t.at }));
+    const first = history[0]?.price ?? asset.currentPrice;
+    const last = history[history.length - 1]?.price ?? asset.currentPrice;
+    const prev = history.length > 1 ? history[history.length - 2].price : last;
     return {
       id: asset.id,
       symbol: asset.symbol,
       name: asset.name,
       sector: asset.sector,
       price: asset.currentPrice,
-      history: ticks.map((t) => ({ tick: t.tick, price: t.price, at: t.at })),
+      unlockLevel: asset.unlockLevel,
+      blurb: blurbFor(asset.symbol),
+      changePct: prev > 0 ? ((last - prev) / prev) * 100 : 0,
+      changePctRange: first > 0 ? ((last - first) / first) * 100 : 0,
+      history,
       glossary: {
         action: 'Une action = une part de propriété d’une entreprise fictive.',
         pnl: 'P&L = gains ou pertes latents / réalisés sur ton portefeuille.',
         gbm: 'Les prix évoluent via une simulation réaliste (mouvement brownien géométrique).',
+        secteur: `Secteur ${asset.sector} — les titres d’un même secteur bougent souvent ensemble.`,
       },
     };
   }
@@ -115,7 +214,6 @@ export class MarketService implements OnModuleInit {
         });
       });
 
-      // Keep history bounded
       const cutoff = nextTick - 200;
       if (cutoff > 0) {
         await this.prisma.priceTick.deleteMany({ where: { tick: { lt: cutoff } } });

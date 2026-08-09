@@ -25,7 +25,7 @@ Jeu de **portefeuille boursier 100 % fictif** : capital virtuel, swipe type Tind
 | Bloc | Scope |
 |------|--------|
 | Progression | Niveaux **1–10** uniquement |
-| Univers | **5 actions** blue-chip fictives, capital **10k€**, objectif **15k€** |
+| Univers | **15 actions** fictives (8 dès le niv. 1, unlock progressif), capital **10k€**, objectifs croissants |
 | Marché | **GBM partagé** + mean reversion + circuit breakers + events rares |
 | Tick | Accéléré in-game (1 tick ≈ 1h de marché) |
 | Trading | Achat / vente, cash, P&L, historique |

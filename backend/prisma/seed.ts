@@ -1,18 +1,21 @@
 import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
+import { ASSET_CATALOG } from '../src/market/assets.catalog';
 
 const prisma = new PrismaClient();
 
-const FALLBACK_ASSETS = [
-  { symbol: 'TECH', name: 'TechNova SA', sector: 'tech', price0: 120, mu: 0.00012, sigma: 0.018, anchor: 125, kappa: 0.06 },
-  { symbol: 'RETL', name: 'RetailMax SE', sector: 'consumer', price0: 85, mu: 0.00008, sigma: 0.014, anchor: 88, kappa: 0.07 },
-  { symbol: 'ENRG', name: 'Energia Corp', sector: 'energy', price0: 64, mu: 0.00005, sigma: 0.022, anchor: 70, kappa: 0.05 },
-  { symbol: 'HLTH', name: 'MediLife AG', sector: 'health', price0: 95, mu: 0.0001, sigma: 0.012, anchor: 98, kappa: 0.08 },
-  { symbol: 'BANK', name: 'SolidBank Group', sector: 'finance', price0: 48, mu: 0.00006, sigma: 0.016, anchor: 50, kappa: 0.07 },
-];
-
-type SeedAsset = (typeof FALLBACK_ASSETS)[number];
+type SeedAsset = {
+  symbol: string;
+  name: string;
+  sector: string;
+  price0: number;
+  mu: number;
+  sigma: number;
+  anchor: number;
+  kappa: number;
+  unlockLevel: number;
+};
 
 function loadMarket(): { assets: SeedAsset[]; series: Record<string, number[]> | null } {
   const candidates = [
@@ -22,24 +25,42 @@ function loadMarket(): { assets: SeedAsset[]; series: Record<string, number[]> |
   for (const file of candidates) {
     if (!fs.existsSync(file)) continue;
     const raw = JSON.parse(fs.readFileSync(file, 'utf-8')) as {
-      assets: SeedAsset[];
+      assets: Array<SeedAsset & { unlock_level?: number }>;
       series: Record<string, number[]>;
     };
+    const bySymbol = new Map(ASSET_CATALOG.map((a) => [a.symbol, a]));
     return {
-      assets: raw.assets.map((a) => ({
-        symbol: a.symbol,
-        name: a.name,
-        sector: a.sector,
-        price0: a.price0,
-        mu: a.mu,
-        sigma: a.sigma,
-        anchor: a.anchor,
-        kappa: a.kappa ?? 0.08,
-      })),
+      assets: raw.assets.map((a) => {
+        const cat = bySymbol.get(a.symbol);
+        return {
+          symbol: a.symbol,
+          name: a.name,
+          sector: a.sector,
+          price0: a.price0,
+          mu: a.mu,
+          sigma: a.sigma,
+          anchor: a.anchor,
+          kappa: a.kappa ?? 0.08,
+          unlockLevel: a.unlockLevel ?? a.unlock_level ?? cat?.unlockLevel ?? 1,
+        };
+      }),
       series: raw.series,
     };
   }
-  return { assets: FALLBACK_ASSETS, series: null };
+  return {
+    assets: ASSET_CATALOG.map((a) => ({
+      symbol: a.symbol,
+      name: a.name,
+      sector: a.sector,
+      price0: a.price0,
+      mu: a.mu,
+      sigma: a.sigma,
+      anchor: a.anchor,
+      kappa: a.kappa,
+      unlockLevel: a.unlockLevel,
+    })),
+    series: null,
+  };
 }
 
 async function main() {
@@ -63,7 +84,7 @@ async function main() {
         anchor: a.anchor,
         kappa: a.kappa ?? 0.08,
         currentPrice: a.price0,
-        unlockLevel: 1,
+        unlockLevel: a.unlockLevel,
       },
     });
 
@@ -83,6 +104,29 @@ async function main() {
     });
   }
 
+  // Ajoute les titres du catalogue absents du JSON de simu
+  for (const cat of ASSET_CATALOG) {
+    const exists = await prisma.asset.findUnique({ where: { symbol: cat.symbol } });
+    if (exists) continue;
+    const created = await prisma.asset.create({
+      data: {
+        symbol: cat.symbol,
+        name: cat.name,
+        sector: cat.sector,
+        price0: cat.price0,
+        mu: cat.mu,
+        sigma: cat.sigma,
+        anchor: cat.anchor,
+        kappa: cat.kappa,
+        currentPrice: cat.price0,
+        unlockLevel: cat.unlockLevel,
+      },
+    });
+    await prisma.priceTick.create({
+      data: { assetId: created.id, price: cat.price0, tick: 0 },
+    });
+  }
+
   const lastTick = series
     ? Math.max(...Object.values(series).map((s) => s.length - 1))
     : 0;
@@ -91,7 +135,8 @@ async function main() {
     data: { id: 1, currentTick: lastTick },
   });
 
-  console.log(`Seeded ${assets.length} assets, market tick=${lastTick}`);
+  const count = await prisma.asset.count();
+  console.log(`Seeded ${count} assets, market tick=${lastTick}`);
 }
 
 main()

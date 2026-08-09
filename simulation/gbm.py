@@ -31,14 +31,25 @@ class AssetSpec:
     sigma: float  # volatility
     anchor: float  # mean-reversion target
     kappa: float = 0.08  # mean-reversion strength
+    unlock_level: int = 1
 
 
 DEFAULT_ASSETS: list[AssetSpec] = [
-    AssetSpec("TECH", "TechNova SA", "tech", 120.0, 0.00012, 0.018, 125.0, 0.06),
-    AssetSpec("RETL", "RetailMax SE", "consumer", 85.0, 0.00008, 0.014, 88.0, 0.07),
-    AssetSpec("ENRG", "Energia Corp", "energy", 64.0, 0.00005, 0.022, 70.0, 0.05),
-    AssetSpec("HLTH", "MediLife AG", "health", 95.0, 0.00010, 0.012, 98.0, 0.08),
-    AssetSpec("BANK", "SolidBank Group", "finance", 48.0, 0.00006, 0.016, 50.0, 0.07),
+    AssetSpec("TECH", "TechNova SA", "tech", 120.0, 0.00012, 0.018, 125.0, 0.06, 1),
+    AssetSpec("RETL", "RetailMax SE", "consumer", 85.0, 0.00008, 0.014, 88.0, 0.07, 1),
+    AssetSpec("ENRG", "Energia Corp", "energy", 64.0, 0.00005, 0.022, 70.0, 0.05, 1),
+    AssetSpec("HLTH", "MediLife AG", "health", 95.0, 0.00010, 0.012, 98.0, 0.08, 1),
+    AssetSpec("BANK", "SolidBank Group", "finance", 48.0, 0.00006, 0.016, 50.0, 0.07, 1),
+    AssetSpec("CLOUD", "CloudPeak Systems", "tech", 142.0, 0.00014, 0.020, 150.0, 0.05, 1),
+    AssetSpec("FOOD", "FreshBite Foods", "consumer", 36.0, 0.00007, 0.013, 38.0, 0.08, 1),
+    AssetSpec("CHIP", "SemiCore NV", "tech", 210.0, 0.00015, 0.024, 220.0, 0.045, 1),
+    AssetSpec("AUTO", "AutoDrive Motors", "industrial", 78.0, 0.00009, 0.019, 82.0, 0.06, 2),
+    AssetSpec("MINE", "OreForge Mining", "materials", 52.0, 0.00004, 0.026, 55.0, 0.04, 3),
+    AssetSpec("MEDIA", "StreamWave Media", "consumer", 29.0, 0.00011, 0.021, 32.0, 0.055, 4),
+    AssetSpec("UTIL", "GridPower Utilities", "utilities", 41.0, 0.00003, 0.010, 42.0, 0.09, 5),
+    AssetSpec("AIR", "SkyLink Airways", "industrial", 67.0, 0.00008, 0.023, 70.0, 0.05, 6),
+    AssetSpec("PAY", "PayNova Fintech", "finance", 88.0, 0.00013, 0.020, 92.0, 0.055, 7),
+    AssetSpec("LUXE", "Maison Luxe", "consumer", 310.0, 0.00010, 0.015, 320.0, 0.07, 8),
 ]
 
 # Pairwise sector correlation (symmetric). Diagonal = 1.
@@ -48,16 +59,37 @@ SECTOR_CORR = {
     ("tech", "energy"): 0.15,
     ("tech", "health"): 0.25,
     ("tech", "finance"): 0.35,
+    ("tech", "industrial"): 0.4,
+    ("tech", "materials"): 0.2,
+    ("tech", "utilities"): 0.15,
     ("consumer", "consumer"): 1.0,
     ("consumer", "energy"): 0.20,
     ("consumer", "health"): 0.30,
     ("consumer", "finance"): 0.40,
+    ("consumer", "industrial"): 0.35,
+    ("consumer", "materials"): 0.25,
+    ("consumer", "utilities"): 0.2,
     ("energy", "energy"): 1.0,
     ("energy", "health"): 0.10,
     ("energy", "finance"): 0.25,
+    ("energy", "industrial"): 0.35,
+    ("energy", "materials"): 0.45,
+    ("energy", "utilities"): 0.4,
     ("health", "health"): 1.0,
     ("health", "finance"): 0.30,
+    ("health", "industrial"): 0.2,
+    ("health", "materials"): 0.15,
+    ("health", "utilities"): 0.2,
     ("finance", "finance"): 1.0,
+    ("finance", "industrial"): 0.35,
+    ("finance", "materials"): 0.25,
+    ("finance", "utilities"): 0.3,
+    ("industrial", "industrial"): 1.0,
+    ("industrial", "materials"): 0.5,
+    ("industrial", "utilities"): 0.3,
+    ("materials", "materials"): 1.0,
+    ("materials", "utilities"): 0.25,
+    ("utilities", "utilities"): 1.0,
 }
 
 
