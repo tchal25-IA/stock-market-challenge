@@ -4,11 +4,11 @@ Jeu de bourse fictive — Phase 1 (niveaux 1–10).
 
 ## Déploiement
 
-| Couche | Plateforme | Notes |
-|--------|------------|--------|
-| App web (Expo) | **Vercel** | Jouable dans le navigateur |
-| API (NestJS) | **Vercel** | Serverless + SQLite seedée (`/tmp`) |
-| Code | **GitHub** | Repo dédié |
+| Couche | Plateforme | URL |
+|--------|------------|-----|
+| App web (Expo) | **Vercel** | https://stock-market-challenge.vercel.app |
+| API (NestJS) | **Vercel** | https://stock-market-challenge-api.vercel.app/api |
+| Code | **GitHub** | https://github.com/tchal25-IA/stock-market-challenge |
 
 > SQLite sur Vercel = demo / vertical slice. Pour une prod durable : PostgreSQL (Supabase/Neon).
 

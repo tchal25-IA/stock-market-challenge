@@ -5,6 +5,9 @@ dist/
 build/
 .expo/
 simulation/out/
+simulation/__pycache__/
+**/__pycache__/
+*.pyc
 *.log
 coverage/
 backend/prisma/dev.db
