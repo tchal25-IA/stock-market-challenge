@@ -1,6 +1,6 @@
 # Stock Market Challenge — Phase 0 (cadrage validé)
 
-**Statut :** Phase 0 terminée et validée. Phase 1 livrée (GBM + API + mobile swipe niveaux 1–10).
+**Statut :** Phase 0 terminée. Phase 1 livrée. Phase 1.1 en cours (niveaux 1–20, obligations, matières, bot Hold, auth renforcée, Postgres prêt).
 
 ---
 
