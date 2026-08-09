@@ -34,3 +34,4 @@ cd mobile && EXPO_PUBLIC_API_URL=http://localhost:3001/api npx expo start
 
 - [PHASE-0-CADRAGE.md](./PHASE-0-CADRAGE.md)
 - [SPECIFICATIONS.md](./SPECIFICATIONS.md)
+- [CONTINUITE-CURSOR.md](./CONTINUITE-CURSOR.md) — reprise Mac / iPhone via Cursor

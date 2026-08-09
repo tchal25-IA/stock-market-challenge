@@ -17,7 +17,9 @@ async function request<T>(
   });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(body || res.statusText);
+    const err = new Error(body || res.statusText) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
   }
   return res.json() as Promise<T>;
 }

@@ -79,24 +79,41 @@ export default function App() {
     if (!p.tutorialDone) setTutorial(true);
   }, []);
 
+  const startGuest = useCallback(async () => {
+    const auth = await api.guest();
+    await AsyncStorage.setItem(TOKEN_KEY, auth.accessToken);
+    setToken(auth.accessToken);
+    await refresh(auth.accessToken);
+    return auth.accessToken;
+  }, [refresh]);
+
   useEffect(() => {
     (async () => {
       try {
         let tok = await AsyncStorage.getItem(TOKEN_KEY);
         if (!tok) {
-          const auth = await api.guest();
-          tok = auth.accessToken;
-          await AsyncStorage.setItem(TOKEN_KEY, tok);
+          tok = await startGuest();
+        } else {
+          setToken(tok);
+          try {
+            await refresh(tok);
+          } catch (e) {
+            const status = (e as Error & { status?: number }).status;
+            if (status === 401 || status === 403) {
+              await AsyncStorage.removeItem(TOKEN_KEY);
+              await startGuest();
+            } else {
+              throw e;
+            }
+          }
         }
-        setToken(tok);
-        await refresh(tok);
       } catch (e) {
         Alert.alert('Erreur', `API indisponible: ${(e as Error).message}`);
       } finally {
         setLoading(false);
       }
     })();
-  }, [refresh]);
+  }, [refresh, startGuest]);
 
   useEffect(() => {
     if (!token) return;

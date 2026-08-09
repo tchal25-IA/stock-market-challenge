@@ -12,28 +12,38 @@ const FALLBACK_ASSETS = [
   { symbol: 'BANK', name: 'SolidBank Group', sector: 'finance', price0: 48, mu: 0.00006, sigma: 0.016, anchor: 50, kappa: 0.07 },
 ];
 
-async function main() {
-  const marketJson = path.resolve(__dirname, '../../simulation/out/market.json');
-  let assets = FALLBACK_ASSETS;
-  let series: Record<string, number[]> | null = null;
+type SeedAsset = (typeof FALLBACK_ASSETS)[number];
 
-  if (fs.existsSync(marketJson)) {
-    const raw = JSON.parse(fs.readFileSync(marketJson, 'utf-8')) as {
-      assets: typeof FALLBACK_ASSETS;
+function loadMarket(): { assets: SeedAsset[]; series: Record<string, number[]> | null } {
+  const candidates = [
+    path.resolve(__dirname, 'seed-market.json'),
+    path.resolve(__dirname, '../../simulation/out/market.json'),
+  ];
+  for (const file of candidates) {
+    if (!fs.existsSync(file)) continue;
+    const raw = JSON.parse(fs.readFileSync(file, 'utf-8')) as {
+      assets: SeedAsset[];
       series: Record<string, number[]>;
     };
-    assets = raw.assets.map((a) => ({
-      symbol: a.symbol,
-      name: a.name,
-      sector: a.sector,
-      price0: a.price0,
-      mu: a.mu,
-      sigma: a.sigma,
-      anchor: a.anchor,
-      kappa: a.kappa ?? 0.08,
-    }));
-    series = raw.series;
+    return {
+      assets: raw.assets.map((a) => ({
+        symbol: a.symbol,
+        name: a.name,
+        sector: a.sector,
+        price0: a.price0,
+        mu: a.mu,
+        sigma: a.sigma,
+        anchor: a.anchor,
+        kappa: a.kappa ?? 0.08,
+      })),
+      series: raw.series,
+    };
   }
+  return { assets: FALLBACK_ASSETS, series: null };
+}
+
+async function main() {
+  const { assets, series } = loadMarket();
 
   await prisma.trade.deleteMany();
   await prisma.holding.deleteMany();
@@ -51,14 +61,13 @@ async function main() {
         mu: a.mu,
         sigma: a.sigma,
         anchor: a.anchor,
-        kappa: a.kappa,
+        kappa: a.kappa ?? 0.08,
         currentPrice: a.price0,
         unlockLevel: 1,
       },
     });
 
     const prices = series?.[a.symbol] ?? [a.price0];
-    // Seed last 48 ticks for charts (or all if shorter)
     const slice = prices.slice(-48);
     const startTick = Math.max(0, prices.length - slice.length);
     await prisma.priceTick.createMany({
