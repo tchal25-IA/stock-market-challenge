@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "nest build",
-    "start": "nest start",
+    "build": "rm -f tsconfig.tsbuildinfo && nest build",
+    "start": "node dist/main",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
     "bake:db": "node scripts/bake-db.js",
