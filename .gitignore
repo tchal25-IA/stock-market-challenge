@@ -15,3 +15,5 @@ backend/prisma/dev.db-journal
 backend/prisma/seed.db
 backend/prisma/seed.db-journal
 .vercel/
+.vercel
+.env*.local
