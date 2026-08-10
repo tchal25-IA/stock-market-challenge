@@ -5,8 +5,8 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Déploie depuis la racine du monorepo.
-# Les projets Vercel ont rootDirectory = backend | mobile (connexion GitHub).
+# Déploie depuis la racine. Les projets Vercel ont rootDirectory = backend | mobile.
+# On évite `vercel build --prebuilt` (casse souvent le bake SQLite / chemins monorepo).
 jobs:
   deploy-api:
     runs-on: ubuntu-latest
@@ -19,7 +19,7 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install root deps (workspaces)
         run: npm ci
-      - name: Pull Vercel env & deploy API
+      - name: Deploy API
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -30,8 +30,7 @@ jobs:
             exit 0
           fi
           npx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-          npx vercel build --prod --token="$VERCEL_TOKEN"
-          npx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+          npx vercel deploy --prod --yes --token="$VERCEL_TOKEN"
 
   deploy-mobile:
     runs-on: ubuntu-latest
@@ -44,7 +43,7 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install root deps (workspaces)
         run: npm ci
-      - name: Pull Vercel env & deploy mobile
+      - name: Deploy mobile
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -56,5 +55,4 @@ jobs:
             exit 0
           fi
           npx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-          npx vercel build --prod --token="$VERCEL_TOKEN"
-          npx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+          npx vercel deploy --prod --yes --token="$VERCEL_TOKEN"
