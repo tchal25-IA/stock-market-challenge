@@ -5,10 +5,11 @@
 | Cible | URL | Statut |
 |-------|-----|--------|
 | **App web** | https://stock-market-challenge.vercel.app | Production Phase 1.1 |
-| **API** | https://stock-market-challenge-api.vercel.app/api | Production Phase 1.1 (27 titres seed, niveaux 1–20) |
+| **API** | https://stock-market-challenge-api.vercel.app/api | Production Phase 1.1 (niveaux 1–20, bots, instruments) |
 | **GitHub** | https://github.com/tchal25-IA/stock-market-challenge | `main` = source de vérité |
 
-Redéployé le **2026-08-10** depuis le build cloud (Phase 1.1 + polish).
+Synchronisé le **2026-08-10** avec le build cloud (Phase 1.1).  
+Push sur `main` → GitHub Actions **Deploy Vercel** (secrets + `rootDirectory` monorepo).
 
 ## CI GitHub Actions
 
