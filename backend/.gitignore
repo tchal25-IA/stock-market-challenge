@@ -8,3 +8,4 @@ prisma/dev.db-journal
 prisma/seed.db
 prisma/seed.db-journal
 prisma/prisma/
+.env*.local
