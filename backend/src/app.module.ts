@@ -7,6 +7,7 @@ import { MarketModule } from './market/market.module';
 import { PortfolioModule } from './portfolio/portfolio.module';
 import { TradingModule } from './trading/trading.module';
 import { BotsModule } from './bots/bots.module';
+import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -19,6 +20,7 @@ import { HealthController } from './health.controller';
     PortfolioModule,
     TradingModule,
     BotsModule,
+    LeaderboardModule,
   ],
   controllers: [HealthController],
 })

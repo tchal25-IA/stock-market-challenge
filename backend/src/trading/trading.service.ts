@@ -4,6 +4,9 @@ import { PrismaService } from '../prisma/prisma.service';
 /** Niveau minimum pour le bot Hold Champion. */
 export const HOLD_BOT_UNLOCK_LEVEL = 11;
 
+/** Niveau minimum pour le bot Swing Trader. */
+export const SWING_BOT_UNLOCK_LEVEL = 21;
+
 @Injectable()
 export class TradingService {
   constructor(private readonly prisma: PrismaService) {}
