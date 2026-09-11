@@ -29,7 +29,7 @@ const { width } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.26;
 const CARD_W = Math.min(width - 40, 420);
 
-type Tab = 'market' | 'portfolio' | 'bots' | 'history';
+type Tab = 'market' | 'portfolio' | 'bots' | 'history' | 'leaderboard';
 type MarketMode = 'swipe' | 'list';
 type AuthMode = 'welcome' | 'login' | 'register' | 'claim';
 
@@ -81,6 +81,7 @@ export default function App() {
   const [bots, setBots] = useState<BotInfo[]>([]);
   const [botsUnlocked, setBotsUnlocked] = useState(false);
   const [botUnlockLevel, setBotUnlockLevel] = useState(11);
+  const [leaderboard, setLeaderboard] = useState<{ by: 'portfolio' | 'level'; entries: any[]; currentUserRank?: any; totalPlayers: number } | null>(null);
   const [tick, setTick] = useState(0);
   const [lastEvent, setLastEvent] = useState<string | null>(null);
   const [unlockedCount, setUnlockedCount] = useState(0);
@@ -136,8 +137,15 @@ export default function App() {
   const loadBots = useCallback(async (tok: string) => {
     const b = await api.bots(tok);
     setBots(b.bots);
-    setBotsUnlocked(b.unlocked);
-    setBotUnlockLevel(b.unlockLevel);
+    const anyUnlocked = b.bots.some((bot) => bot.unlocked);
+    setBotsUnlocked(anyUnlocked);
+    const minUnlock = Math.min(...b.bots.map((bot) => bot.unlockLevel ?? 999));
+    setBotUnlockLevel(minUnlock);
+  }, []);
+
+  const loadLeaderboard = useCallback(async (tok: string, by: 'portfolio' | 'level' = 'portfolio') => {
+    const lb = await api.leaderboard(tok, by);
+    setLeaderboard(lb);
   }, []);
 
   useEffect(() => {
@@ -180,7 +188,8 @@ export default function App() {
     if (!token) return;
     if (tab === 'history') loadHistory(token).catch(() => undefined);
     if (tab === 'bots') loadBots(token).catch(() => undefined);
-  }, [tab, token, loadHistory, loadBots]);
+    if (tab === 'leaderboard') loadLeaderboard(token).catch(() => undefined);
+  }, [tab, token, loadHistory, loadBots, loadLeaderboard]);
 
   useEffect(() => {
     Animated.loop(
@@ -655,28 +664,26 @@ export default function App() {
 
         {tab === 'bots' ? (
           <ScrollView contentContainerStyle={styles.listPad}>
-            {!botsUnlocked ? (
-              <View style={styles.unlockBox}>
-                <Text style={styles.unlockTitle}>Bots verrouillés</Text>
-                <Text style={styles.cardBlurb}>
-                  Le bot Hold Champion se débloque au niveau {botUnlockLevel}. Il achète automatiquement des titres
-                  stables à chaque tick.
-                </Text>
-              </View>
-            ) : (
-              bots.map((b) => (
-                <View key={b.kind} style={styles.pos}>
+            {bots.map((b) => {
+              const isLocked = b.unlocked === false;
+              return (
+                <View key={b.kind} style={[styles.pos, isLocked && { opacity: 0.5 }]}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.posSym}>{b.name}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={styles.posSym}>{b.name}</Text>
+                      {isLocked && b.unlockLevel && <Text style={styles.posMeta}>Niv. {b.unlockLevel}</Text>}
+                    </View>
                     <Text style={styles.posMeta}>{b.description}</Text>
-                    <Text style={styles.posMeta}>Allocation {b.allocationPct}% du cash</Text>
+                    {!isLocked && <Text style={styles.posMeta}>Allocation {b.allocationPct}% du cash</Text>}
                   </View>
-                  <Pressable style={[styles.sellChip, b.enabled && { backgroundColor: colors.gain }]} onPress={() => toggleBot(b)}>
-                    <Text style={styles.sellChipText}>{b.enabled ? 'ON' : 'OFF'}</Text>
-                  </Pressable>
+                  {!isLocked && (
+                    <Pressable style={[styles.sellChip, b.enabled && { backgroundColor: colors.gain }]} onPress={() => toggleBot(b)}>
+                      <Text style={styles.sellChipText}>{b.enabled ? 'ON' : 'OFF'}</Text>
+                    </Pressable>
+                  )}
                 </View>
-              ))
-            )}
+              );
+            })}
           </ScrollView>
         ) : null}
 
@@ -703,6 +710,60 @@ export default function App() {
           </ScrollView>
         ) : null}
 
+        {tab === 'leaderboard' ? (
+          <ScrollView contentContainerStyle={styles.listPad}>
+            <View style={styles.modeRow}>
+              <Pressable 
+                style={[styles.modeChip, leaderboard?.by === 'portfolio' && styles.modeOn]} 
+                onPress={() => token && loadLeaderboard(token, 'portfolio')}
+              >
+                <Text style={[styles.modeText, leaderboard?.by === 'portfolio' && styles.modeTextOn]}>Portfolio</Text>
+              </Pressable>
+              <Pressable 
+                style={[styles.modeChip, leaderboard?.by === 'level' && styles.modeOn]} 
+                onPress={() => token && loadLeaderboard(token, 'level')}
+              >
+                <Text style={[styles.modeText, leaderboard?.by === 'level' && styles.modeTextOn]}>Niveau</Text>
+              </Pressable>
+            </View>
+            {leaderboard ? (
+              <>
+                <Text style={styles.metaText}>
+                  Top 100 · {leaderboard.totalPlayers} joueurs
+                </Text>
+                {leaderboard.entries.map((entry: any) => (
+                  <View key={entry.rank} style={[styles.pos, entry.isCurrentUser && { borderColor: colors.accent, borderWidth: 2 }]}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={styles.posSym}>#{entry.rank}</Text>
+                        <Text style={styles.posMeta}>{entry.username}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.posVal}>
+                      {leaderboard.by === 'portfolio' ? formatEur(entry.value) : `Niv. ${entry.value}`}
+                    </Text>
+                  </View>
+                ))}
+                {leaderboard.currentUserRank && (
+                  <View style={[styles.pos, { borderColor: colors.accent, borderWidth: 2, marginTop: 16 }]}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={styles.posSym}>#{leaderboard.currentUserRank.rank}</Text>
+                        <Text style={styles.posMeta}>{leaderboard.currentUserRank.username} (Vous)</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.posVal}>
+                      {leaderboard.by === 'portfolio' ? formatEur(leaderboard.currentUserRank.value) : `Niv. ${leaderboard.currentUserRank.value}`}
+                    </Text>
+                  </View>
+                )}
+              </>
+            ) : (
+              <Text style={styles.empty}>Chargement...</Text>
+            )}
+          </ScrollView>
+        ) : null}
+
         <View style={styles.tabs}>
           {(
             [
@@ -710,6 +771,7 @@ export default function App() {
               ['portfolio', 'Portfolio'],
               ['bots', 'Bots'],
               ['history', 'Histo'],
+              ['leaderboard', 'Classmt'],
             ] as const
           ).map(([key, label]) => (
             <Pressable key={key} style={[styles.tab, tab === key && styles.tabOn]} onPress={() => setTab(key)}>

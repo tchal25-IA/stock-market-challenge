@@ -133,6 +133,22 @@ export type BotInfo = {
   description: string;
   enabled: boolean;
   allocationPct: number;
+  unlockLevel?: number;
+  unlocked?: boolean;
+};
+
+export type LeaderboardEntry = {
+  rank: number;
+  username: string;
+  value: number;
+  isCurrentUser: boolean;
+};
+
+export type LeaderboardResponse = {
+  by: 'portfolio' | 'level';
+  entries: LeaderboardEntry[];
+  currentUserRank?: LeaderboardEntry;
+  totalPlayers: number;
 };
 
 export const api = {
@@ -171,14 +187,15 @@ export const api = {
     }>(`/market/assets/${symbol}`, { token }),
   portfolio: (token: string) => request<Portfolio>('/portfolio', { token }),
   history: (token: string) => request<TradeRow[]>('/portfolio/history', { token }),
-  bots: (token: string) =>
-    request<{ unlockLevel: number; unlocked: boolean; bots: BotInfo[] }>('/bots', { token }),
+  bots: (token: string) => request<{ bots: BotInfo[] }>('/bots', { token }),
   configureBot: (token: string, kind: string, enabled: boolean, allocationPct: number) =>
     request('/bots/configure', {
       method: 'POST',
       token,
       body: JSON.stringify({ kind, enabled, allocationPct }),
     }),
+  leaderboard: (token: string, by: 'portfolio' | 'level' = 'portfolio') =>
+    request<LeaderboardResponse>(`/leaderboard?by=${by}`, { token }),
   buy: (token: string, symbol: string, amountEur: number) =>
     request('/trading/buy', {
       method: 'POST',
